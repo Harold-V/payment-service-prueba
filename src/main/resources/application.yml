@@ -1,0 +1,68 @@
+spring:
+  application:
+    name: payment-service
+
+  # --- Configuración JPA / H2
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    open-in-view: false
+    properties:
+      hibernate:
+        "[format_sql]": true
+    database-platform: org.hibernate.dialect.MySQLDialect
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/paymentdb?useSSL=false&serverTimezone=UTC
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: root
+    password: ""
+
+  h2:
+    console:
+      enabled: true
+
+  # --- Consul Discovery
+  cloud:
+    consul:
+      host: localhost
+      port: 8500
+      discovery:
+        register: true
+        service-name: ${spring.application.name}
+        health-check-path: /api/actuator/health
+        health-check-interval: 10s
+        prefer-ip-address: true
+        # --- Etiquetas para Traefik
+        tags:
+          - traefik.enable=true
+          - traefik.http.routers.payment.rule=PathPrefix(`/api`)
+          - traefik.http.routers.payment.entrypoints=web
+
+# --- Puerto aleatorio
+server:
+  port: ${PORT:0}
+  servlet:
+    context-path: /api
+
+# --- Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+
+# Wompi
+wompi:
+  public-key: pub_test_jp7FAX2Vm9eOHeNIlWoZAaQ1XHUubs8w
+  private-key: prv_test_Bqn07DxSMyqX1PM0jyoERHpscMCIDBfG
+  base-url: https://sandbox.wompi.co/v1
+  events-key: test_events_LRa70QHdmE6bucZehQ2X9KsXM4eEYKQA
+  integrity-secret: test_integrity_6DI4RlmcdCAL6ZGmQV6Od2UzhsbowY2m
+  webhook-url: http://localhost:8081/api/v1/payments/wompi/webhook # URL pública para recibir webhooks de Wompi
