@@ -29,7 +29,7 @@ public class PaymentTransactionEntity {
     @Column(name = "transaction_id", nullable = false, length = 100)
     private UUID transactionId;
 
-    @Column(name = "external_transaction_id", nullable = false, length = 100)
+    @Column(name = "external_transaction_id", length = 100)
     private String externalTransactionId;
 
     @Column(name = "payment_reference", nullable = false, length = 100, unique = true)
@@ -62,7 +62,7 @@ public class PaymentTransactionEntity {
     @Column(name = "rejection_cause", length = 500)
     private String rejectionCause;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
+    @Column(name = "created_at", updatable = false)
     private ZonedDateTime createdAt;
 
     @Column(name = "updated_at")
