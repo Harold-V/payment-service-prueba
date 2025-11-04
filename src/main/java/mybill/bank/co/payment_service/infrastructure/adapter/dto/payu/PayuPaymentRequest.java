@@ -6,8 +6,8 @@ import java.util.UUID;
 import jakarta.validation.constraints.NotBlank;
 import mybill.bank.co.payment_service.domain.enumerations.CurrencyType;
 import mybill.bank.co.payment_service.domain.enumerations.PaymentType;
-import mybill.bank.co.payment_service.infrastructure.adapter.dto.CustomerData;
-import mybill.bank.co.payment_service.infrastructure.adapter.dto.ShippingAddress;
+import mybill.bank.co.payment_service.infrastructure.adapter.dto.wompi.WompiCustomerData;
+import mybill.bank.co.payment_service.infrastructure.adapter.dto.wompi.WompiShippingAddress;
 
 public record PayuPaymentRequest(
 
@@ -23,9 +23,9 @@ public record PayuPaymentRequest(
 
                 String fullName,
 
-                CustomerData customerData,
+                WompiCustomerData customerData,
 
-                ShippingAddress shippingAddress,
+                WompiShippingAddress shippingAddress,
 
                 UUID paymentMethodId,
 

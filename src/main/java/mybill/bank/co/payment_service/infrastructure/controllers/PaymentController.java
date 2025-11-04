@@ -1,16 +1,18 @@
 package mybill.bank.co.payment_service.infrastructure.controllers;
 
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import mybill.bank.co.payment_service.application.ports.in.PaymentUseCase;
 import mybill.bank.co.payment_service.infrastructure.adapter.dto.wompi.WompiPaymentRequest;
 import mybill.bank.co.payment_service.infrastructure.adapter.dto.wompi.WompiPaymentResponse;
 import mybill.bank.co.payment_service.infrastructure.adapter.dto.wompi.WompiWebHookResponse;
+import mybill.bank.co.payment_service.infrastructure.security.WompiEventVerifier;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.Map;
 
@@ -20,6 +22,8 @@ import java.util.Map;
 @Slf4j
 public class PaymentController {
     private final PaymentUseCase paymentUseCase;
+    private final WompiEventVerifier wompiEventVerifier;
+    private final ObjectMapper objectMapper;
 
     @PostMapping
     public ResponseEntity<WompiPaymentResponse> create(@RequestBody WompiPaymentRequest request) {
@@ -28,11 +32,24 @@ public class PaymentController {
     }
 
     @PostMapping("/webhook")
-    public ResponseEntity<Void> webhook(@RequestHeader Map<String, String> headers,
-            @RequestBody WompiWebHookResponse body,
-            HttpServletRequest servletRequest) {
-        // (Opcional) valida firma/checksum aquí con tu WompiConfig antes de delegar
+    public ResponseEntity<Void> webhook(
+            @RequestHeader(value = "X-Event-Checksum", required = false) String checksum,
+            @RequestBody Map<String, Object> payload) {
+
+        // 1) Validar firma
+        if (!wompiEventVerifier.isValid(checksum, payload)) {
+            // Si no validamos, devolvemos 400 (Wompi reintentará)
+            return ResponseEntity.badRequest().build();
+        }
+
+        // 2) Convertir al DTO tipado para la capa de aplicación
+        WompiWebHookResponse body = objectMapper.convertValue(payload, WompiWebHookResponse.class);
+
+        // 3) Procesar (idempotente: tu servicio ya hace upsert/actualización por
+        // reference)
         paymentUseCase.handleWompiWebhook(body);
+
+        // 4) Responder 200 (Wompi no reintenta)
         return ResponseEntity.ok().build();
     }
 

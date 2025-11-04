@@ -1,4 +1,4 @@
-package mybill.bank.co.payment_service.infrastructure.adapter.dto;
+package mybill.bank.co.payment_service.infrastructure.adapter.dto.wompi;
 
 import jakarta.validation.constraints.NotBlank;
 
@@ -11,7 +11,7 @@ import jakarta.validation.constraints.NotBlank;
  * tales como la calle, ciudad, estado, país y código postal.
  * </p>
  */
-public record ShippingAddress(
+public record WompiShippingAddress(
                 /**
                  * Calle principal de la dirección de envío.
                  * Este campo debe contener la primera línea de la dirección de envío.
@@ -42,5 +42,11 @@ public record ShippingAddress(
 
                 /* País en formato "CO" */
                 @NotBlank(message = "El país es obligatorio") String country) {
+
+        public WompiShippingAddress {
+                if (addressLine2 == null) {
+                        addressLine2 = "";
+                }
+        }
 
 }

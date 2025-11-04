@@ -82,20 +82,16 @@ public class PaymentService implements PaymentUseCase {
     @Override
     @Transactional
     public void handleWompiWebhook(WompiWebHookResponse webhook) {
-        // 1) Tomamos transaction.id y reference desde el webhook
         var t = webhook.data().transaction();
         String reference = t.reference();
         String externalId = t.id();
 
-        // 2) Buscamos la transacción por reference (creada en createWompiPayment)
         PaymentTransaction tx = paymentRepository.findByPaymentReference(reference)
                 .orElseGet(() -> {
-                    // Si por algún motivo el webhook llega primero, creamos registro mínimo
+                    // Si llegó primero el webhook, crea registro mínimo
                     PaymentTransaction created = newPending(
-                            /* invoiceId */ reference.split("-")[1], // extraído del formato
-                                                                     // MYBILL-<invoiceId>-<payerId>
-                            /* payerId */ reference.split("-")[2], // extraído del formato
-                                                                   // MYBILL-<invoiceId>-<payerId>
+                            /* invoiceId */ parseInvoiceId(reference),
+                            /* payerId */ parsePayerId(reference),
                             /* amount */ BigDecimal.valueOf(t.amountInCents()).movePointLeft(2),
                             /* currency */ CurrencyType.valueOf(t.currency().toUpperCase()),
                             /* provider */ PaymentProvider.WOMPI,
@@ -103,15 +99,15 @@ public class PaymentService implements PaymentUseCase {
                     return paymentRepository.save(created);
                 });
 
-        // 3) Actualizamos estado y metadatos
         tx.setExternalTransactionId(externalId);
         tx.setStatus(mapWompiStatus(t.status()));
-        tx.setResponseCode(t.paymentMethodType()); // puedes mapear mejor si defines códigos concretos
-        tx.setRejectionCause(t.redirectUrl()); // placeholder: ajusta con el campo correcto si Wompi entrega cause
-        tx.setUpdatedAt(ZonedDateTime.now());
+        // Usa campos reales del evento:
+        tx.setResponseCode(t.paymentMethodType()); // o deja null si no te aporta
+        // Wompi no envía "rejection_cause" aquí; evita poner redirectUrl como causa
+        tx.setRejectionCause(null);
 
+        tx.setUpdatedAt(ZonedDateTime.now());
         paymentRepository.save(tx);
-        log.info("Updated transaction {} to {}", reference, tx.getStatus());
     }
 
     @Override
@@ -130,6 +126,16 @@ public class PaymentService implements PaymentUseCase {
             case "PENDING" -> TransactionStatus.PENDING;
             default -> TransactionStatus.ERROR;
         };
+    }
+
+    private String parseInvoiceId(String ref) {
+        String[] parts = ref.split("-");
+        return parts.length >= 3 ? parts[1] : "UNKNOWN";
+    }
+
+    private String parsePayerId(String ref) {
+        String[] parts = ref.split("-");
+        return parts.length >= 3 ? parts[2] : "UNKNOWN";
     }
 
 }
