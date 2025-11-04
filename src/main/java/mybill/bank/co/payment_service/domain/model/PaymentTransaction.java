@@ -11,6 +11,7 @@ import lombok.Setter;
 import mybill.bank.co.payment_service.domain.enumerations.CurrencyType;
 import mybill.bank.co.payment_service.domain.enumerations.TransactionStatus;
 import mybill.bank.co.payment_service.domain.enumerations.PaymentProvider;
+import mybill.bank.co.payment_service.domain.enumerations.PaymentType;
 
 @Getter
 @Setter
@@ -47,6 +48,9 @@ public class PaymentTransaction {
 
     /** Nombre de la pasarela de pago utilizada (Wompi, PayU, etc.). */
     private PaymentProvider paymentProvider;
+
+    /** Tipo de pago (PSE, tarjeta, etc.). */
+    private PaymentType paymentType;
 
     /** Código de respuesta específico retornado por la pasarela. */
     private String responseCode;

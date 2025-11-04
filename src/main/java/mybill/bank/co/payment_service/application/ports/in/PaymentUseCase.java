@@ -14,6 +14,9 @@ public interface PaymentUseCase {
     // 2) Procesa webhook de Wompi (actualiza estado y campos retornados)
     void handleWompiWebhook(WompiWebHookResponse response);
 
-    // 3) Crea pago con PayU (similar idea; aquí puedes iniciar PSE/Tarjeta)
+    // 3) Verifica la integridad del evento recibido desde Wompi
+    boolean verifyWompiEventIntegrity(String checksum, WompiWebHookResponse payload);
+
+    // 4) Crea pago con PayU (similar idea; aquí puedes iniciar PSE/Tarjeta)
     PayuPaymentResponse createPayuPayment(PayuPaymentRequest request);
 }

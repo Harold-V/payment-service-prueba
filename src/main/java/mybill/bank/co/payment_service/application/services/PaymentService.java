@@ -1,6 +1,8 @@
 package mybill.bank.co.payment_service.application.services;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.ZonedDateTime;
 import java.util.UUID;
 
@@ -13,6 +15,7 @@ import mybill.bank.co.payment_service.application.ports.in.PaymentUseCase;
 import mybill.bank.co.payment_service.application.ports.out.TransactionWompiUseCase;
 import mybill.bank.co.payment_service.domain.enumerations.CurrencyType;
 import mybill.bank.co.payment_service.domain.enumerations.PaymentProvider;
+import mybill.bank.co.payment_service.domain.enumerations.PaymentType;
 import mybill.bank.co.payment_service.domain.enumerations.TransactionStatus;
 import mybill.bank.co.payment_service.domain.model.PaymentTransaction;
 import mybill.bank.co.payment_service.domain.ports.PaymentTransactionRepositoryPort;
@@ -21,6 +24,7 @@ import mybill.bank.co.payment_service.infrastructure.adapter.dto.payu.PayuPaymen
 import mybill.bank.co.payment_service.infrastructure.adapter.dto.wompi.WompiPaymentRequest;
 import mybill.bank.co.payment_service.infrastructure.adapter.dto.wompi.WompiPaymentResponse;
 import mybill.bank.co.payment_service.infrastructure.adapter.dto.wompi.WompiWebHookResponse;
+import mybill.bank.co.payment_service.infrastructure.config.WompiConfig;
 
 @Service
 @RequiredArgsConstructor
@@ -28,10 +32,11 @@ import mybill.bank.co.payment_service.infrastructure.adapter.dto.wompi.WompiWebH
 public class PaymentService implements PaymentUseCase {
 
     private final TransactionWompiUseCase wompiGateway;
+    private final WompiConfig wompiConfig;
     private final PaymentTransactionRepositoryPort paymentRepository;
 
     // --- Helpers para construir/actualizar dominio ---
-    private PaymentTransaction newPending(String invoiceId, String payerId, BigDecimal amount, CurrencyType currency,
+    private PaymentTransaction newPending(String invoiceId, String payerId, BigDecimal amount,
             PaymentProvider provider, String reference) {
         ZonedDateTime now = ZonedDateTime.now();
         PaymentTransaction tx = new PaymentTransaction();
@@ -42,8 +47,9 @@ public class PaymentService implements PaymentUseCase {
         tx.setPayerId(payerId);
         tx.setInvoiceId(invoiceId);
         tx.setAmount(amount);
-        tx.setCurrencyType(currency);
+        tx.setCurrencyType(CurrencyType.COP);
         tx.setPaymentProvider(provider);
+        tx.setPaymentType(null);
         tx.setResponseCode(null);
         tx.setRejectionCause(null);
         tx.setCreatedAt(now);
@@ -69,7 +75,6 @@ public class PaymentService implements PaymentUseCase {
                     /* invoiceId */ request.invoiceId(),
                     /* payerId */ request.payerId(),
                     /* amount */ amount,
-                    /* currency */ response.currency(),
                     /* provider */ PaymentProvider.WOMPI,
                     /* reference */ reference);
             paymentRepository.save(pending);
@@ -93,7 +98,6 @@ public class PaymentService implements PaymentUseCase {
                             /* invoiceId */ parseInvoiceId(reference),
                             /* payerId */ parsePayerId(reference),
                             /* amount */ BigDecimal.valueOf(t.amountInCents()).movePointLeft(2),
-                            /* currency */ CurrencyType.valueOf(t.currency().toUpperCase()),
                             /* provider */ PaymentProvider.WOMPI,
                             /* reference */ reference);
                     return paymentRepository.save(created);
@@ -101,13 +105,27 @@ public class PaymentService implements PaymentUseCase {
 
         tx.setExternalTransactionId(externalId);
         tx.setStatus(mapWompiStatus(t.status()));
+        tx.setPaymentType(mapWompiPaymentType(t.paymentMethodType()));
         // Usa campos reales del evento:
-        tx.setResponseCode(t.paymentMethodType()); // o deja null si no te aporta
+        tx.setResponseCode(t.paymentMethod().extra().returnCode()); // o deja null si no te aporta
         // Wompi no envía "rejection_cause" aquí; evita poner redirectUrl como causa
         tx.setRejectionCause(null);
 
         tx.setUpdatedAt(ZonedDateTime.now());
         paymentRepository.save(tx);
+    }
+
+    @Override
+    public boolean verifyWompiEventIntegrity(String checksum, WompiWebHookResponse payload) {
+        String generatedSignature = generateEventSignature(payload);
+        boolean isValid = generatedSignature.equalsIgnoreCase(checksum);
+        if (isValid) {
+            log.info("Wompi webhook integrity verified successfully.");
+        } else {
+            log.warn("Wompi webhook integrity verification failed. Expected: {}, Generated: {}", checksum,
+                    generatedSignature);
+        }
+        return isValid;
     }
 
     @Override
@@ -128,6 +146,16 @@ public class PaymentService implements PaymentUseCase {
         };
     }
 
+    private static PaymentType mapWompiPaymentType(String wompiType) {
+        if (wompiType == null)
+            return null;
+        return switch (wompiType.toUpperCase()) {
+            case "CARD" -> PaymentType.CREDIT;
+            case "PSE" -> PaymentType.PSE;
+            default -> null;
+        };
+    }
+
     private String parseInvoiceId(String ref) {
         String[] parts = ref.split("-");
         return parts.length >= 3 ? parts[1] : "UNKNOWN";
@@ -136,6 +164,41 @@ public class PaymentService implements PaymentUseCase {
     private String parsePayerId(String ref) {
         String[] parts = ref.split("-");
         return parts.length >= 3 ? parts[2] : "UNKNOWN";
+    }
+
+    private String generateEventSignature(WompiWebHookResponse webhook) {
+        try {
+            StringBuilder concatenatedText = new StringBuilder();
+
+            String id = webhook.data().transaction().id();
+            Long amountInCents = webhook.data().transaction().amountInCents();
+            String status = webhook.data().transaction().status();
+            String timestamp = webhook.timestamp().toString();
+            concatenatedText.append(id)
+                    .append(status)
+                    .append(amountInCents)
+                    .append(timestamp)
+                    .append(wompiConfig.getEventsKey());
+
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(concatenatedText.toString().getBytes(StandardCharsets.UTF_8));
+
+            // Convertir a hexadecimal
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1)
+                    hexString.append('0');
+                hexString.append(hex);
+            }
+
+            return hexString.toString();
+
+        } catch (Exception e) {
+            log.error("Error generating integrity signature", e);
+            throw new RuntimeException("Failed to generate integrity signature", e);
+        }
+
     }
 
 }

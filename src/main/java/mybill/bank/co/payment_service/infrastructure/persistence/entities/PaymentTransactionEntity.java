@@ -16,6 +16,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import mybill.bank.co.payment_service.domain.enumerations.CurrencyType;
 import mybill.bank.co.payment_service.domain.enumerations.PaymentProvider;
+import mybill.bank.co.payment_service.domain.enumerations.PaymentType;
 import mybill.bank.co.payment_service.domain.enumerations.TransactionStatus;
 
 @Entity
@@ -55,6 +56,10 @@ public class PaymentTransactionEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "payment_provider", nullable = false, length = 30)
     private PaymentProvider paymentProvider;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_type", length = 30)
+    private PaymentType paymentType;
 
     @Column(name = "response_code", length = 20)
     private String responseCode;
