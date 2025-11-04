@@ -3,7 +3,7 @@ package mybill.bank.co.payment_service.infrastructure.controllers;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import mybill.bank.co.payment_service.application.ports.out.PaymentTransactionWompiUseCase;
+import mybill.bank.co.payment_service.application.ports.out.TransactionWompiUseCase;
 import mybill.bank.co.payment_service.infrastructure.adapter.dto.wompi.WompiPaymentRequest;
 import mybill.bank.co.payment_service.infrastructure.adapter.dto.wompi.WompiPaymentResponse;
 import org.springframework.http.HttpStatus;
@@ -17,7 +17,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 @Slf4j
 public class WompiPaymentController {
-    private final PaymentTransactionWompiUseCase wompiUseCase;
+    private final TransactionWompiUseCase wompiUseCase;
 
     @PostMapping
     public ResponseEntity<WompiPaymentResponse> create(@RequestBody WompiPaymentRequest request) {
@@ -25,15 +25,8 @@ public class WompiPaymentController {
         return ResponseEntity.status(HttpStatus.CREATED).body(resp);
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<WompiPaymentResponse> status(@PathVariable String id) {
-        return ResponseEntity.ok(wompiUseCase.getPaymentStatus(id));
-    }
-
-    // webhook endpoint
     @PostMapping("/webhook")
     public ResponseEntity<Void> webhook(@RequestHeader Map<String, String> headers,
-
             @RequestBody Map<String, Object> body,
             HttpServletRequest servletRequest) {
         return ResponseEntity.ok().build();

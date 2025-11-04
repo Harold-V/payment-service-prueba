@@ -2,6 +2,7 @@ package mybill.bank.co.payment_service.infrastructure.persistence.entities;
 
 import java.math.BigDecimal;
 import java.time.ZonedDateTime;
+import java.util.UUID;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -26,7 +27,10 @@ import mybill.bank.co.payment_service.domain.enumerations.TransactionStatus;
 public class PaymentTransactionEntity {
     @Id
     @Column(name = "transaction_id", nullable = false, length = 100)
-    private String transactionId;
+    private UUID transactionId;
+
+    @Column(name = "external_transaction_id", nullable = false, length = 100)
+    private String externalTransactionId;
 
     @Column(name = "payment_reference", nullable = false, length = 100, unique = true)
     private String paymentReference;
@@ -34,9 +38,6 @@ public class PaymentTransactionEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     private TransactionStatus status;
-
-    @Column(name = "transaction_date", nullable = false)
-    private ZonedDateTime transactionDate;
 
     @Column(name = "payer_id", nullable = false, length = 50)
     private String payerId;

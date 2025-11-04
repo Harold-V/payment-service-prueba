@@ -55,4 +55,18 @@ public class WompiConfig {
      * sido manipulados.
      */
     private String integritySecret;
+
+    /**
+     * URL del webhook configurada en Wompi.
+     * Esta URL es donde Wompi enviará las notificaciones de eventos relacionados
+     * con las transacciones.
+     */
+    private String webhookUrl;
+
+    /**
+     * URL de redirección después del pago.
+     * Esta URL es donde se redirigirá al usuario después de completar el proceso
+     * de pago en Wompi.
+     */
+    private String redirectUrl;
 }

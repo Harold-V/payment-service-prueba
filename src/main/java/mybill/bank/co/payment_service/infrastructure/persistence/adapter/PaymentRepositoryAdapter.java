@@ -1,12 +1,13 @@
 package mybill.bank.co.payment_service.infrastructure.persistence.adapter;
 
 import java.util.Optional;
+import java.util.UUID;
 
 import org.springframework.stereotype.Component;
 
 import lombok.RequiredArgsConstructor;
-import mybill.bank.co.payment_service.application.ports.in.PaymentTransactionRepositoryPort;
 import mybill.bank.co.payment_service.domain.model.PaymentTransaction;
+import mybill.bank.co.payment_service.domain.ports.PaymentTransactionRepositoryPort;
 import mybill.bank.co.payment_service.infrastructure.persistence.entities.PaymentTransactionEntity;
 import mybill.bank.co.payment_service.infrastructure.persistence.mappers.PaymentMapper;
 import mybill.bank.co.payment_service.infrastructure.persistence.repositories.JpaPaymentRepository;
@@ -26,27 +27,15 @@ public class PaymentRepositoryAdapter implements PaymentTransactionRepositoryPor
     }
 
     @Override
-    public Optional<PaymentTransaction> findById(String id) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'findById'");
+    public Optional<PaymentTransaction> findById(UUID id) {
+        return jpaPaymentRepository.findById(id)
+                .map(paymentMapper::toDomain);
     }
 
     @Override
-    public Optional<PaymentTransaction> findByPaymentReference(String externalId) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'findByPaymentReference'");
-    }
-
-    @Override
-    public Optional<PaymentTransaction> findByPayerId(String payerId) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'findByPayerId'");
-    }
-
-    @Override
-    public Optional<PaymentTransaction> findByInvoiceId(String invoiceId) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'findByInvoiceId'");
+    public Optional<PaymentTransaction> findByPaymentReference(String reference) {
+        return jpaPaymentRepository.findByPaymentReference(reference)
+                .map(paymentMapper::toDomain);
     }
 
 }

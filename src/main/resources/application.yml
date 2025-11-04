@@ -17,7 +17,7 @@ spring:
     url: jdbc:mysql://localhost:3306/paymentdb?useSSL=false&serverTimezone=UTC
     driver-class-name: com.mysql.cj.jdbc.Driver
     username: root
-    password: ""
+    password:
 
   h2:
     console:
@@ -29,7 +29,7 @@ spring:
       host: localhost
       port: 8500
       discovery:
-        register: true
+        register: true # ← AGREGADO
         service-name: ${spring.application.name}
         health-check-path: /api/actuator/health
         health-check-interval: 10s
@@ -65,4 +65,5 @@ wompi:
   base-url: https://sandbox.wompi.co/v1
   events-key: test_events_LRa70QHdmE6bucZehQ2X9KsXM4eEYKQA
   integrity-secret: test_integrity_6DI4RlmcdCAL6ZGmQV6Od2UzhsbowY2m
-  webhook-url: http://localhost:8081/api/v1/payments/wompi/webhook # URL pública para recibir webhooks de Wompi
+  webhook-url: # URL pública para recibir webhooks de Wompi
+  redirect-url: https://docs.wompi.co/docs/colombia/inicio-rapido/

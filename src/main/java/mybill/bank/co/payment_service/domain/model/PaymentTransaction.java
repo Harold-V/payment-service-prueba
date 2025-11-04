@@ -2,9 +2,11 @@ package mybill.bank.co.payment_service.domain.model;
 
 import java.math.BigDecimal;
 import java.time.ZonedDateTime;
+import java.util.UUID;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 import mybill.bank.co.payment_service.domain.enumerations.CurrencyType;
 import mybill.bank.co.payment_service.domain.enumerations.TransactionStatus;
@@ -13,10 +15,14 @@ import mybill.bank.co.payment_service.domain.enumerations.PaymentProvider;
 @Getter
 @Setter
 @AllArgsConstructor
+@NoArgsConstructor
 public class PaymentTransaction {
 
+    /** ID único de la transacción */
+    private UUID transactionId;
+
     /** ID único de la transacción (generado por la pasarela). */
-    private String transactionId;
+    private String externalTransactionId;
 
     /**
      * Referencia única asociada al pago (puede ser el ID de la factura u otro
@@ -26,9 +32,6 @@ public class PaymentTransaction {
 
     /** Resultado general de la transacción: aprobado, rechazado, pendiente, etc. */
     private TransactionStatus status;
-
-    /** Fecha y hora en que se realizó la transacción. */
-    private ZonedDateTime transactionDate;
 
     /** Identificador del pagador (usuario, cliente o entidad). */
     private String payerId;
@@ -50,4 +53,11 @@ public class PaymentTransaction {
 
     /** Causa o motivo del rechazo, si aplica. */
     private String rejectionCause;
+
+    /** Fecha y hora de creación de la transacción. */
+    private ZonedDateTime createdAt;
+
+    /** Fecha y hora de última actualización de la transacción. */
+    private ZonedDateTime updatedAt;
+
 }
