@@ -7,7 +7,7 @@ import java.time.ZonedDateTime;
 
 import org.springframework.stereotype.Service;
 
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import mybill.bank.co.payment_service.application.ports.in.PaymentUseCase;
@@ -34,7 +34,6 @@ public class PaymentService implements PaymentUseCase {
     private final PaymentTransactionRepositoryPort paymentRepository;
 
     @Override
-    @Transactional
     public WompiPaymentResponse createWompiPayment(WompiPaymentRequest request) {
         // 1) Llama a la pasarela para construir los datos de pago (ref, firma, etc.)
         WompiPaymentResponse response = wompiGateway.processPayment(request);
@@ -58,7 +57,7 @@ public class PaymentService implements PaymentUseCase {
                             reference);
 
                     paymentRepository.save(pending);
-                    log.info("Saved PENDING transaction for reference {}", reference);
+                    log.info("Saved PENDING transaction  {}", pending);
                 });
 
         return response;
@@ -67,26 +66,16 @@ public class PaymentService implements PaymentUseCase {
     @Override
     @Transactional
     public void handleWompiWebhook(WompiWebHookResponse webhook) {
+        log.info("Received Wompi webhook: {}", webhook);
         var t = webhook.data().transaction();
         String reference = t.reference();
         String externalId = t.id();
 
+        // Buscar la transacción existente
         PaymentTransaction tx = paymentRepository.findByPaymentReference(reference)
-                .orElseGet(() -> {
-                    // Si llegó primero el webhook, crea registro mínimo
-                    BigDecimal amount = BigDecimal.valueOf(t.amountInCents()).movePointLeft(2);
-
-                    PaymentTransaction created = PaymentTransaction.createPending(
-                            parseInvoiceId(reference),
-                            parsePayerId(reference),
-                            amount,
-                            PaymentProvider.WOMPI,
-                            reference);
-
-                    return paymentRepository.save(created);
-                });
-
+                .orElseThrow(() -> new IllegalStateException("Transaction not found"));
         // Actualizar con datos del webhook
+        log.info("Updating transaction {} with webhook data", reference);
         tx.setExternalTransactionId(externalId);
         tx.setStatus(mapWompiStatus(t.status()));
         tx.setPaymentType(mapWompiPaymentType(t.paymentMethodType()));
@@ -94,6 +83,9 @@ public class PaymentService implements PaymentUseCase {
         tx.setRejectionCause(null);
         tx.setUpdatedAt(ZonedDateTime.now());
 
+        log.info(tx.toString());
+
+        // Guardar una sola vez
         paymentRepository.save(tx);
 
         log.info("Updated transaction {} from webhook. Status: {}, ExternalId: {}",
@@ -139,16 +131,6 @@ public class PaymentService implements PaymentUseCase {
             case "PSE" -> PaymentType.PSE;
             default -> null;
         };
-    }
-
-    private String parseInvoiceId(String ref) {
-        String[] parts = ref.split("-");
-        return parts.length >= 3 ? parts[1] : "UNKNOWN";
-    }
-
-    private String parsePayerId(String ref) {
-        String[] parts = ref.split("-");
-        return parts.length >= 3 ? parts[2] : "UNKNOWN";
     }
 
     private String generateEventSignature(WompiWebHookResponse webhook) {

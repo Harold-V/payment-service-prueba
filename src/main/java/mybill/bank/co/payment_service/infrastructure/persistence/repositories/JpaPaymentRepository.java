@@ -11,8 +11,4 @@ public interface JpaPaymentRepository extends JpaRepository<PaymentTransactionEn
 
     Optional<PaymentTransactionEntity> findByPaymentReference(String externalId);
 
-    Optional<PaymentTransactionEntity> findByPayerId(String payerId);
-
-    Optional<PaymentTransactionEntity> findByInvoiceId(String invoiceId);
-
 }
