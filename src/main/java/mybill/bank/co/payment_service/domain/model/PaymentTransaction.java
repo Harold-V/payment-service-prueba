@@ -64,4 +64,42 @@ public class PaymentTransaction {
     /** Fecha y hora de última actualización de la transacción. */
     private ZonedDateTime updatedAt;
 
+    /**
+     * Crea una nueva transacción de pago en estado PENDING.
+     * 
+     * @param invoiceId ID de la factura asociada
+     * @param payerId   Identificador del pagador
+     * @param amount    Monto del pago
+     * @param provider  Proveedor de pago
+     * @param reference Referencia única del pago
+     * @return Nueva instancia de PaymentTransaction en estado pendiente
+     */
+    public static PaymentTransaction createPending(
+            String invoiceId,
+            String payerId,
+            BigDecimal amount,
+            PaymentProvider provider,
+            String reference) {
+
+        ZonedDateTime now = ZonedDateTime.now();
+
+        PaymentTransaction transaction = new PaymentTransaction();
+        transaction.transactionId = UUID.randomUUID();
+        transaction.externalTransactionId = null;
+        transaction.paymentReference = reference;
+        transaction.status = TransactionStatus.PENDING;
+        transaction.payerId = payerId;
+        transaction.invoiceId = invoiceId;
+        transaction.amount = amount;
+        transaction.currencyType = CurrencyType.COP;
+        transaction.paymentProvider = provider;
+        transaction.paymentType = null;
+        transaction.responseCode = null;
+        transaction.rejectionCause = null;
+        transaction.createdAt = now;
+        transaction.updatedAt = now;
+
+        return transaction;
+    }
+
 }

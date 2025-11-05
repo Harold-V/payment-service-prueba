@@ -4,7 +4,6 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.ZonedDateTime;
-import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 
@@ -13,7 +12,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import mybill.bank.co.payment_service.application.ports.in.PaymentUseCase;
 import mybill.bank.co.payment_service.application.ports.out.TransactionWompiUseCase;
-import mybill.bank.co.payment_service.domain.enumerations.CurrencyType;
 import mybill.bank.co.payment_service.domain.enumerations.PaymentProvider;
 import mybill.bank.co.payment_service.domain.enumerations.PaymentType;
 import mybill.bank.co.payment_service.domain.enumerations.TransactionStatus;
@@ -35,28 +33,6 @@ public class PaymentService implements PaymentUseCase {
     private final WompiConfig wompiConfig;
     private final PaymentTransactionRepositoryPort paymentRepository;
 
-    // --- Helpers para construir/actualizar dominio ---
-    private PaymentTransaction newPending(String invoiceId, String payerId, BigDecimal amount,
-            PaymentProvider provider, String reference) {
-        ZonedDateTime now = ZonedDateTime.now();
-        PaymentTransaction tx = new PaymentTransaction();
-        tx.setTransactionId(UUID.randomUUID());
-        tx.setExternalTransactionId(null);
-        tx.setPaymentReference(reference);
-        tx.setStatus(TransactionStatus.PENDING);
-        tx.setPayerId(payerId);
-        tx.setInvoiceId(invoiceId);
-        tx.setAmount(amount);
-        tx.setCurrencyType(CurrencyType.COP);
-        tx.setPaymentProvider(provider);
-        tx.setPaymentType(null);
-        tx.setResponseCode(null);
-        tx.setRejectionCause(null);
-        tx.setCreatedAt(now);
-        tx.setUpdatedAt(now);
-        return tx;
-    }
-
     @Override
     @Transactional
     public WompiPaymentResponse createWompiPayment(WompiPaymentRequest request) {
@@ -66,20 +42,24 @@ public class PaymentService implements PaymentUseCase {
         // 2) Persistir una transacción PENDING (si ya existe por reference, evita
         // duplicar)
         String reference = response.reference();
-        paymentRepository.findByPaymentReference(reference).ifPresentOrElse(existing -> {
-            log.info("Transaction with reference {} already exists. Skipping create.", reference);
-        }, () -> {
-            // amountInCents -> BigDecimal en unidades
-            BigDecimal amount = BigDecimal.valueOf(response.amountInCents()).movePointLeft(2);
-            PaymentTransaction pending = newPending(
-                    /* invoiceId */ request.invoiceId(),
-                    /* payerId */ request.payerId(),
-                    /* amount */ amount,
-                    /* provider */ PaymentProvider.WOMPI,
-                    /* reference */ reference);
-            paymentRepository.save(pending);
-            log.info("Saved PENDING transaction for reference {}", reference);
-        });
+        paymentRepository.findByPaymentReference(reference).ifPresentOrElse(
+                existing -> {
+                    log.info("Transaction with reference {} already exists. Skipping create.", reference);
+                },
+                () -> {
+                    // amountInCents -> BigDecimal en unidades
+                    BigDecimal amount = BigDecimal.valueOf(response.amountInCents()).movePointLeft(2);
+
+                    PaymentTransaction pending = PaymentTransaction.createPending(
+                            request.invoiceId(),
+                            request.payerId(),
+                            amount,
+                            PaymentProvider.WOMPI,
+                            reference);
+
+                    paymentRepository.save(pending);
+                    log.info("Saved PENDING transaction for reference {}", reference);
+                });
 
         return response;
     }
@@ -94,25 +74,30 @@ public class PaymentService implements PaymentUseCase {
         PaymentTransaction tx = paymentRepository.findByPaymentReference(reference)
                 .orElseGet(() -> {
                     // Si llegó primero el webhook, crea registro mínimo
-                    PaymentTransaction created = newPending(
-                            /* invoiceId */ parseInvoiceId(reference),
-                            /* payerId */ parsePayerId(reference),
-                            /* amount */ BigDecimal.valueOf(t.amountInCents()).movePointLeft(2),
-                            /* provider */ PaymentProvider.WOMPI,
-                            /* reference */ reference);
+                    BigDecimal amount = BigDecimal.valueOf(t.amountInCents()).movePointLeft(2);
+
+                    PaymentTransaction created = PaymentTransaction.createPending(
+                            parseInvoiceId(reference),
+                            parsePayerId(reference),
+                            amount,
+                            PaymentProvider.WOMPI,
+                            reference);
+
                     return paymentRepository.save(created);
                 });
 
+        // Actualizar con datos del webhook
         tx.setExternalTransactionId(externalId);
         tx.setStatus(mapWompiStatus(t.status()));
         tx.setPaymentType(mapWompiPaymentType(t.paymentMethodType()));
-        // Usa campos reales del evento:
-        tx.setResponseCode(t.paymentMethod().extra().returnCode()); // o deja null si no te aporta
-        // Wompi no envía "rejection_cause" aquí; evita poner redirectUrl como causa
+        tx.setResponseCode(t.paymentMethod().extra().returnCode());
         tx.setRejectionCause(null);
-
         tx.setUpdatedAt(ZonedDateTime.now());
+
         paymentRepository.save(tx);
+
+        log.info("Updated transaction {} from webhook. Status: {}, ExternalId: {}",
+                reference, tx.getStatus(), externalId);
     }
 
     @Override
